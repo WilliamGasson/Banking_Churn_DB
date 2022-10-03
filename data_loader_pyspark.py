@@ -53,6 +53,7 @@ def state_to_code( x):
 cust_df = spark.read.table("hive_metastore.default.customers_data_csv")
 tran_df = spark.read.table("hive_metastore.default.transactions_data_csv")
 
+display(tran_df)
 gdp = spark.read.table("hive_metastore.default.GDP_data_quarterly_csv")
 income = spark.read.table("hive_metastore.default.income_data_csv")
 interest = spark.read.table("hive_metastore.default.interest_rate_data_csv")
@@ -66,15 +67,13 @@ from pyspark.sql.functions import *
 from pyspark.sql.window import Window
 import pyspark.sql.functions as F
 from pyspark.sql.functions import row_number
+from pyspark.sql.functions import udf
 
 df = tran_df.limit(100000)
-display(df)
 
-# df["volume"] = df.groupby('account_id').cumcount()
 w = Window().orderBy(['account_id', "date"])
 df = df.withColumn("volume", row_number().over(w))
 
-df.withColumn("date", to_date(col("date"),"yyyy-MM-dd"))
 df = df.groupby(["account_id", "date"]).agg({"account_id": "mean",
                                             "customer_id": "mean",
                                             "amount": "mean",
@@ -83,45 +82,56 @@ df = df.groupby(["account_id", "date"]).agg({"account_id": "mean",
                                             "volume": "count"
                                             })
 
+df = df.withColumnRenamed("avg(customer_id)", "customer_id") \
+       .withColumnRenamed("avg(amount)","amount")\
+       .withColumnRenamed("avg(withdrawal)","withdrawal")\
+       .withColumnRenamed("avg(deposit)","deposit")\
+       .withColumnRenamed("count(volume)","volume") \
+       .drop("avg(account_id)")
 
 display(df)
 
 
-# COMMAND ----------
-
-df = df.join(cust_df, df["avg(customer_id)"] == cust_df["customer_id"])           
-
-df['state'] = df['state'].apply(lambda x: state_to_code(x)) # todo drop australia
-df = df.drop(columns=["customer_id"])
-df.head()
 
 # COMMAND ----------
 
 
-df['balance'] = df.groupby('account_id')['amount'].cumsum()
-df['balance'] += df['start_balance']
+df = df.withColumn("customer_id", col("customer_id").cast("double"))
 
-df['account_length'] = pd.to_datetime(df['date'])-pd.to_datetime(df['creation_date'])
+df = df.join(cust_df, df["customer_id"] == cust_df["customer_id"])  
 
-df['age'] = pd.to_datetime(df['date'])-pd.to_datetime(df['dob'])
+state_udf = udf(state_to_code, StringType()) #
+df= df.withColumn("state", state_udf("state")) #
 
-churn = df.groupby('account_id')['date'].transform('max')
-df['churned'] = np.array((df["date"] == churn))
-
-df.head()
+df = df.drop("customer_id","customer_id")
+display(df)
 
 # COMMAND ----------
 
-gdp.index = pd.to_datetime(gdp.index, format='%Y/%m/%d')
-income.index = pd.to_datetime(income.index)
-interest.index = pd.to_datetime(interest.index)
-umcs.index = pd.to_datetime(umcs.index)
-unemployment.index = pd.to_datetime(unemployment.index)
+df = df.withColumn('balance', F.sum(df["amount"]).over(Window.partitionBy('account_id').orderBy("date").rowsBetween(-sys.maxsize, 0)))
 
-income.dropna(inplace=True)
-interest.dropna(inplace=True)
-umcs.dropna(inplace=True)
-unemployment.dropna(inplace=True)
+df = df.withColumn("balance", col("balance")+col("start_balance"))
+
+display(df)
+
+# COMMAND ----------
+
+df= df.withColumn('account_length',datediff(col("date"),col("creation_date")))
+df= df.withColumn('age',datediff(col("date"),col("dob")))
+
+w2 = Window.partitionBy("account_id")
+df = df.withColumn("last_date", F.max("date").over(w2))
+df = df.withColumn('isChurn', F.when((F.col("last_date") == col('date')),1).otherwise(0))
+
+df = df.drop("last_date")
+display(df)
+
+# COMMAND ----------
+
+income = income.dropna()
+interest = interest.dropna()
+umcs = umcs.dropna()
+unemployment = unemployment.dropna()
 
 
 # resample the GDP
