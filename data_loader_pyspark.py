@@ -63,50 +63,33 @@ gdp = gdp.drop('GDPC1')
 # COMMAND ----------
 
 from pyspark.sql.functions import *	
+from pyspark.sql.window import Window
+import pyspark.sql.functions as F
+from pyspark.sql.functions import row_number
 
-df = tran_df.limit(1000)
-
-
-df.withColumn("date", to_date(col("date"),"yyyy-MM-dd"))
-df = df[["account_id",'date', "amount", "deposit", "withdrawal","customer_id"]]
-df = df.partitionBy(["account_id"]).resample('M', on='date').mean()
-
+df = tran_df.limit(100000)
 display(df)
 
 # df["volume"] = df.groupby('account_id').cumcount()
-# vol = df[["account_id","date","volume"]]
-# display(vol)
+w = Window().orderBy(['account_id', "date"])
+df = df.withColumn("volume", row_number().over(w))
+
+df.withColumn("date", to_date(col("date"),"yyyy-MM-dd"))
+df = df.groupby(["account_id", "date"]).agg({"account_id": "mean",
+                                            "customer_id": "mean",
+                                            "amount": "mean",
+                                            "deposit":"mean",
+                                            "withdrawal":"mean",
+                                            "volume": "count"
+                                            })
+
+
+display(df)
 
 
 # COMMAND ----------
 
-tran_df = tran_df.toPandas() 
-
-df = tran_df[:1000]
-
-df["date"] = pd.to_datetime(df["date"])
-
-df["volume"] = df.groupby('account_id').cumcount()
-vol = df[["account_id","date","volume"]]
-
-df = df[["account_id",'date', "amount", "deposit", "withdrawal","customer_id"]]
-df = df.groupby(["account_id"]).resample('M', on='date').mean()
-
-vol = vol.groupby(["account_id"]).resample('M', on='date').count()
-df["volume"] = vol["volume"]
-
-
-df.drop(columns = ["account_id"], inplace=True)
-df.reset_index(inplace=True)
-
-
-df.head()
-
-
-# COMMAND ----------
-
-cust_df = cust_df.toPandas()
-df = df.merge(cust_df, on='customer_id', how='left')           
+df = df.join(cust_df, df["avg(customer_id)"] == cust_df["customer_id"])           
 
 df['state'] = df['state'].apply(lambda x: state_to_code(x)) # todo drop australia
 df = df.drop(columns=["customer_id"])
