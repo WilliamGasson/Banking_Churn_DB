@@ -96,6 +96,7 @@ display(df)
 # COMMAND ----------
 
 
+
 df = df.withColumn("customer_id", col("customer_id").cast("double"))
 
 df = df.join(cust_df, df["customer_id"] == cust_df["customer_id"])  
@@ -162,6 +163,7 @@ final.head()
 
 # COMMAND ----------
 
+
 df = df.merge(final, left_on="date", right_index=True)
 df=  df.sort_values(by=['account_id', 'date'])
 df.head()
@@ -173,5 +175,9 @@ df.to_csv("data/processed/pro_data.csv")
 # COMMAND ----------
 
 dbutils.fs.rm("/FileStore/tables/your_table_name.csv")
+
+
+
+# COMMAND ----------
 
 
