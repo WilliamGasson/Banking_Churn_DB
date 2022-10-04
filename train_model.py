@@ -56,48 +56,43 @@ logger.debug(f"np.random.RandomState initialised with seed {seed}")
 # COMMAND ----------
 
 # 3) Load data
+df = spark.read.table("default.churn_data_csv")
+df.toPandas()
+# 4) Seperate specific test set
+# select data to use and test data
+#df = df['2007-01-31':'2020-05-31']
+# df_train = X_train.copy()
+# df_train["target"] = y_train
+# df_test = X_test.copy()
+# df_test["target"] = y_test
+# Save test data for testing
+# if not os.path.exists('../../resources/data/df_train.csv'):
+#     df_train.to_csv('../../resources/data/df_train.csv', index=False)
+# if not os.path.exists('../../resources/data/df_test.csv'):
+#     df_test.to_csv('../../resources/data/df_test.csv',index=False)
+#    logger.info("Saved the churn dataset train and test sets")
 
-df = spark.read.table(spark.read.table("hive_metastore.default.processed_data_csv"))
-
-# dont use any data that was after 2020
-df = df.drop(df[(df['date'] < 360)].index) 
-
-X = df.drop(columns=['churned'])
-y = df['churned']
+    
+# drop date columns
+df = df.drop("date", "account_id")
+display(df)
 
 
 # COMMAND ----------
 
-# 4) Train/test split 
+# 4) Train/valid split 
 
-# set test data to be the data from 2019-2020
-df = df.drop(df[(df['date'] < 360)].index) 
+X = df.drop('isCurn')
+y = df['isChurn']
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=rng)
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=rng)
+
 logger.debug(f"X_train shape: {X_train.shape}")
 logger.debug(f"y_train shape: {y_train.shape}")
 logger.debug(f"X_test shape: {X_test.shape}")
 logger.debug(f"y_test shape: {y_test.shape}")
 
 logger.info("Loaded the churn dataset into train and test sets")
-
-df_train = X_train.copy()
-df_train["target"] = y_train
-df_test = X_test.copy()
-df_test["target"] = y_test
-
-# Save test data for testing
-
-if not os.path.exists('../../resources/data/df_train.csv'):
-    df_train.to_csv('../../resources/data/df_train.csv', index=False)
-if not os.path.exists('../../resources/data/df_test.csv'):
-    df_test.to_csv('../../resources/data/df_test.csv',index=False)
-    
-logger.info("Saved the churn dataset train and test sets")
-
-# Spliting for validation 
-
-X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=rng)
 
 
 # COMMAND ----------
