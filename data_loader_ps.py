@@ -168,9 +168,26 @@ display(df)
 
 # COMMAND ----------
 
+# Create an unseen dataset
+# drop most recent data
+df = df.withColumn("age", col("age").cast("double")) \
+    .withColumn("account_length", col("account_length").cast("double")) \
+    .withColumn("volume", col("volume").cast("double")) 
+
+df = df.filter(F.col("date") < F.unix_timestamp(F.lit('2020-01-01 00:00:00')).cast('timestamp'))
+# test is between 2018- 2020
+df_test = df.filter(F.col("date") > F.unix_timestamp(F.lit('2018-01-01 00:00:00')).cast('timestamp'))
+# train is between 2007- 2018
+df_train = df.filter(F.col("date") < F.unix_timestamp(F.lit('2018-01-01 00:00:00')).cast('timestamp'))
+
+
+
+# COMMAND ----------
+
 # save data
 dbutils.fs.rm('churn_data_csv')
-df.write.saveAsTable("churn_data_csv")
+df_test.write.saveAsTable("churn_test")
+df_train.write.saveAsTable("churn_train")
 
 # COMMAND ----------
 

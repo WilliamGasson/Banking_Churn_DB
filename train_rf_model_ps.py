@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # train_baseline_model_pyspark.py
+# MAGIC # train_baseline_model_ps.py
 # MAGIC 
 # MAGIC Train KNN model on churn data 
 # MAGIC 
@@ -15,11 +15,11 @@
 # load and split data
 from pyspark.sql.functions import col
 from pyspark.ml.feature import StringIndexer, VectorAssembler
-from pyspark.ml.classification import DecisionTreeClassifier
+from pyspark.ml.classification import RandomForestClassifier
 from pyspark.ml import Pipeline
 
 # load data
-df = spark.read.table("default.churn_data_csv")
+df = spark.read.table("default.churn_train")
 
 
 # df.toPandas()
@@ -54,7 +54,7 @@ vec_assembler = VectorAssembler(inputCols=numeric_cols, outputCol="features")
 
 
 # # baseline model decision tree
-dt = DecisionTreeClassifier(labelCol="isChurn")
+dt = RandomForestClassifier(labelCol="isChurn")
 stages = [string_indexer, vec_assembler, dt]
 pipeline = Pipeline(stages=stages)
 dt.setMaxBins(40)
@@ -65,7 +65,7 @@ pipeline_model = pipeline.fit(train_df)
 import pandas as pd
 
 dt_model = pipeline_model.stages[-1]
-display(dt_model)
+#display(dt_model)
 
 dt_model.featureImportances
 
@@ -81,7 +81,7 @@ print(top_features)
 
 pred_df = pipeline_model.transform(test_df)
 
-display(pred_df.select("features", "isChurn", "prediction").orderBy("isChurn", ascending=False))
+display(pred_df.select("features", "isChurn", "prediction"))
 
 # COMMAND ----------
 
