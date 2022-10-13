@@ -1,6 +1,15 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Data loader
+# MAGIC # data_loader_ps.py
+# MAGIC 
+# MAGIC 1) Imports
+# MAGIC 2) Functions: states to code and removing outliers
+# MAGIC 3) Load data
+# MAGIC 4) Process data
+# MAGIC 5) Macro data
+# MAGIC 6) Join tables
+# MAGIC 7) Save tables
+# MAGIC 8) Feature store
 
 # COMMAND ----------
 
@@ -65,7 +74,10 @@ def remove_outliers(df,columns,n_std):
         df = df[(df[column] >= av - (n_std * sd))]
     return df
 
+# COMMAND ----------
 
+# MAGIC %md 
+# MAGIC ## Load data
 
 # COMMAND ----------
 
@@ -81,6 +93,10 @@ tran_df = remove_outliers(tran_df, ['deposit', 'amount', 'withdrawal'], 4)
 
 display(tran_df)
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Process data
 
 # COMMAND ----------
 
@@ -168,6 +184,24 @@ display(df)
 
 # COMMAND ----------
 
+# MAGIC %md 
+# MAGIC ## Feature engineering
+# MAGIC Features to add
+# MAGIC 1) Change in balance
+# MAGIC 2) Average balance
+# MAGIC 3) 
+
+# COMMAND ----------
+
+#
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Seperate test data
+
+# COMMAND ----------
+
 # Create an unseen dataset
 # drop most recent data
 df = df.withColumn("age", col("age").cast("double")) \
@@ -185,11 +219,28 @@ df_train = df.filter(F.col("date") < F.unix_timestamp(F.lit('2018-01-01 00:00:00
 # COMMAND ----------
 
 # save data
-dbutils.fs.rm('churn_data_csv')
-df_test.write.saveAsTable("churn_test")
-df_train.write.saveAsTable("churn_train")
+df_test.write.mode("overwrite").saveAsTable("churn_test")
+df_train.write.mode("overwrite").saveAsTable("churn_train")
 
 # COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## Feature store
+
+# COMMAND ----------
+
+from databricks import feature_store
+
+fs = feature_store.FeatureStoreClient()
+
+spark.sql(f"CREATE DATABASE IF NOT EXISTS banking_churn")
+
+fs.create_table(
+  name='banking_churn.features',
+  primary_keys='account_id',
+  schema=df.schema,
+  description='Customer features'
+)
 
 
 
